@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>YT Like Counter</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Audiowide&family=Bangers&family=Bebas+Neue&family=Montserrat:wght@800&family=Orbitron:wght@800&family=Oswald:wght@700&family=Pacifico&family=Permanent+Marker&family=Poppins:wght@800&family=Press+Start+2P&family=Righteous&family=Roboto+Mono:wght@700&display=swap" rel="stylesheet">
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; background: transparent; font-family: "Segoe UI", Arial, sans-serif; }
+  .row { display: flex; align-items: center; gap: .3em; line-height: 1.1; width: fit-content; padding: .05em .25em; }
+  .row svg { width: .85em; height: .85em; fill: currentColor; flex: none; }
+  .row .lbl { font-size: .35em; opacity: .85; margin-right: .4em; }
+  .row .num.msg { font-size: .4em; font-weight: 600; }
+  .bump { animation: bump .35s ease; }
+  @keyframes bump { 50% { transform: scale(1.15); } }
+
+  #setup { display: none; max-width: 980px; margin: 24px auto; padding: 0 16px; color: #eee; }
+  #setup h2 { margin: 0 0 16px; }
+  .grid { display: grid; grid-template-columns: 340px 1fr; gap: 20px; }
+  @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+  .card { background: #1c1c1f; border-radius: 12px; padding: 18px; }
+  label { display: block; margin: 12px 0 4px; font-size: 12px; color: #aaa; }
+  input, select { width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #444; background: #111; color: #fff; font-size: 14px; }
+  input[type=color] { padding: 2px; height: 36px; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  button { padding: 10px 16px; border: 0; border-radius: 6px; background: #ff0033; color: #fff; font-weight: 600; cursor: pointer; }
+  button.sec { background: #333; padding: 8px 12px; font-size: 13px; }
+  #preview { min-height: 140px; border-radius: 10px; padding: 20px; color: #fff;
+    background: conic-gradient(#2a2a2e 25%, #333338 0 50%, #2a2a2e 0 75%, #333338 0) 0 0/24px 24px; }
+  #gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-top: 12px; }
+  .tile { background: #111; border: 2px solid transparent; border-radius: 8px; padding: 8px; text-align: center; cursor: pointer; }
+  .tile.on { border-color: #ff0033; }
+  .tile b { display: block; font-size: 26px; font-weight: 400; color: #fff; }
+  .tile small { color: #888; font-size: 11px; }
+  #out { word-break: break-all; font-size: 12px; color: #9cf; background: #111; padding: 10px; border-radius: 6px; margin-top: 12px; display: none; white-space: pre-wrap; }
+  #status div { font-size: 13px; line-height: 1.6; margin-top: 4px; }
+  .ok { color: #7ee787; } .warn { color: #f0c36b; } .bad { color: #ff7b72; } .dim { color: #888; }
+  .note { font-size: 12px; color: #999; margin-top: 10px; line-height: 1.5; }
+  #overlay { display: none; flex-direction: column; padding: 6px; }
+</style>
+</head>
+<body>
+
+<div id="setup">
+  <div class="grid">
+    <div class="card">
+      <label>Channel (@handle or UC... ID)</label>
+      <input id="ch">
+      <div class="two">
+        <div><label>Refresh (seconds, 10+)</label><input id="sec" type="number" value="15" min="5"></div>
+        <div><label>Label (optional)</label><input id="label" value="Likes"></div>
+      </div>
+      <label>Font</label>
+      <select id="font"></select>
+      <div class="two">
+        <div><label>Size (px)</label><input id="size" type="number" value="64" min="12" max="300"></div>
+        <div><label>Color</label><input id="color" type="color" value="#ffffff"></div>
+      </div>
+      <div class="two">
+        <div><label>Effect</label>
+          <select id="fx"><option value="shadow">Shadow</option><option value="outline">Black outline</option><option value="glow">Glow</option><option value="none">None</option></select>
+        </div>
+        <div><label>Icon</label>
+          <select id="icon"><option value="thumb">👍 Thumb</option><option value="heart">❤ Heart</option><option value="none">None</option></select>
+        </div>
+      </div>
+      <label>Show label</label>
+      <select id="labels"><option value="0">No</option><option value="1">Yes</option></select>
+      <label>After the stream ends</label>
+      <select id="next">
+        <option value="0">Stop completely (no more API calls)</option>
+        <option value="1">Stop, then check every 5 min for the next stream</option>
+      </select>
+      <p style="margin-top:16px"><button onclick="generate()">Generate OBS link</button></p>
+      <div id="out"></div>
+      <div class="note">In OBS: Browser Source → <b>untick "Local file"</b> → paste the link into URL.</div>
+    </div>
+    <div>
+      <div class="card"><div id="preview"></div></div>
+      <div class="card" style="margin-top:16px">
+        <button class="sec" onclick="detect()">Detect live streams now</button>
+        <div id="status"><div class="dim">Not checked yet.</div></div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <div style="font-size:13px;color:#aaa">Click a font to use it:</div>
+        <div id="gallery"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="overlay"></div>
+
+<script>
+// ====== SAVED SETTINGS (edit here if they ever change) ======
+const DEFAULTS = {
+  apiKey: "AIzaSyCz5IStosyh2Nxx5SVSU6_EsZi1bQYc4ok",
+  channel: "@Munnabhaigaming"
+};
+// ============================================================
+
+const FONTS = ["Orbitron","Bebas Neue","Anton","Oswald","Montserrat","Poppins","Righteous","Audiowide","Bangers","Permanent Marker","Pacifico","Press Start 2P","Roboto Mono","Segoe UI"];
+const ICONS = {
+  thumb: '<svg viewBox="0 0 24 24"><path d="M1 21h4V9H1v12zm22-11c0-1.1-.9-2-2-2h-6.3l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.59 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2z"/></svg>',
+  heart: '<svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>',
+  none: ''
+};
+const API = "https://www.googleapis.com/youtube/v3/";
+const KEY = DEFAULTS.apiKey;
+const WAIT_MS = 60000;        // how often to look for a stream while none is live
+const NEXT_MS = 300000;       // optional low-rate check for the next stream after one ended
+const MAX_FAILS = 8;          // consecutive temporary errors before giving up (no infinite retry loop)
+const $ = id => document.getElementById(id);
+const q = new URLSearchParams(location.search);
+
+/* ---------------- shared rendering ---------------- */
+function buildRow(c, label, value) {
+  const d = document.createElement("div");
+  d.className = "row";
+  d.style.fontFamily = `"${c.font}", sans-serif`;
+  d.style.fontSize = c.size + "px";
+  d.style.color = c.color;
+  d.style.fontWeight = "800";
+  if (c.fx === "shadow") d.style.textShadow = "0 2px 8px rgba(0,0,0,.8)";
+  if (c.fx === "glow") d.style.textShadow = `0 0 10px ${c.color}, 0 0 24px ${c.color}`;
+  if (c.fx === "outline") { d.style.webkitTextStroke = "0.06em #000"; d.style.paintOrder = "stroke fill"; }
+  d.innerHTML = (c.labels === "1" && label ? `<span class="lbl">${label.replace(/</g, "&lt;")}</span>` : "") +
+    (ICONS[c.icon] || "") + `<span class="num">${value}</span>`;
+  return d;
+}
+
+/* ---------------- YouTube API helpers ---------------- */
+// kind: "quota" (daily quota used up), "key" (bad/blocked key), "network"/"temp"/"other" (retryable, capped)
+class ApiError extends Error { constructor(kind, msg) { super(msg); this.kind = kind; } }
+
+async function api(path) {
+  let r;
+  try { r = await fetch(API + path); } catch (e) { throw new ApiError("network", "Network error"); }
+  let j = null; try { j = await r.json(); } catch (e) {}
+  if (r.ok && j && !j.error) return j;
+  const err = j && j.error;
+  const reason = (err && err.errors && err.errors[0] && err.errors[0].reason) || "";
+  const msg = (err && err.message) || ("HTTP " + r.status);
+  if (/quotaExceeded|dailyLimitExceeded/.test(reason)) throw new ApiError("quota", msg);
+  if (/keyInvalid|keyExpired|accessNotConfigured|ipRefererBlocked|forbidden/.test(reason) || r.status === 401 ||
+      (r.status === 400 && /api key/i.test(msg))) throw new ApiError("key", msg);
+  throw new ApiError(r.status >= 500 || /rateLimit/.test(reason) ? "temp" : "other", msg);
+}
+
+async function resolveChannel(ch) {
+  ch = (ch || "").trim();
+  const m = ch.match(/(UC[\w-]{22})/); if (m) return m[1];
+  const h = ch.replace(/^https?:\/\/(www\.)?youtube\.com\//, "");
+  const handle = h.startsWith("@") ? h.split("/")[0] : "@" + h.split("/")[0];
+  const j = await api(`channels?part=id&forHandle=${encodeURIComponent(handle)}&key=${KEY}`);
+  return j.items && j.items[0] ? j.items[0].id : null;
+}
+
+// Currently-live videos among the channel's 10 newest uploads (2 quota units). Real data only.
+async function findLive(channelId) {
+  const pl = "UU" + channelId.slice(2);
+  const j = await api(`playlistItems?part=contentDetails&playlistId=${pl}&maxResults=10&key=${KEY}`);
+  const ids = j.items.map(i => i.contentDetails.videoId).join(",");
+  if (!ids) return [];
+  const v = await api(`videos?part=snippet,statistics&id=${ids}&key=${KEY}`);
+  return v.items.filter(x => x.snippet.liveBroadcastContent === "live")
+    .map(x => ({ id: x.id, title: x.snippet.title, likes: x.statistics.likeCount }));
+}
+
+// Split live streams into the #Shorts stream(s) (case-insensitive title match) and the main one(s)
+const isShorts = t => t.toLowerCase().includes("#shorts");
+function pickMain(live) { return { shorts: live.filter(x => isShorts(x.title)), main: live.filter(x => !isShorts(x.title)) }; }
+const fmt = n => n === undefined ? "hidden" : Number(n).toLocaleString();
+
+/* ---------------- SETUP PAGE ---------------- */
+function readCfg() {
+  return { ch: $("ch").value.trim(), sec: $("sec").value, label: $("label").value, font: $("font").value, size: $("size").value,
+    color: $("color").value, fx: $("fx").value, icon: $("icon").value, labels: $("labels").value, next: $("next").value };
+}
+function updatePreview() {
+  const c = readCfg(); const p = $("preview"); p.innerHTML = "";
+  p.appendChild(buildRow(c, c.label, "12,345"));          // sample number for styling only
+  document.querySelectorAll(".tile").forEach(t => t.classList.toggle("on", t.dataset.f === c.font));
+  try { localStorage.setItem("ytlc3", JSON.stringify(c)); } catch (e) {}
+}
+function generate() {
+  const link = location.href.split("?")[0].split("#")[0] + "?" + new URLSearchParams({ ...readCfg(), go: "1" });
+  const o = $("out"); o.style.display = "block"; o.textContent = link;
+  try { navigator.clipboard.writeText(link).then(() => o.textContent += "\n\n(copied to clipboard)"); } catch (e) {}
+}
+async function detect() {
+  const st = $("status"); st.innerHTML = "";
+  const add = (cls, text) => { const d = document.createElement("div"); d.className = cls; d.textContent = text; st.appendChild(d); };
+  add("dim", "Checking…");
+  try {
+    const id = await resolveChannel($("ch").value);
+    st.innerHTML = "";
+    if (!id) { add("bad", "Channel not found."); return; }
+    const { shorts, main } = pickMain(await findLive(id));
+    add("dim", `Live streams found: ${shorts.length + main.length}`);
+    shorts.forEach(x => add("warn", `✖ Ignored (#Shorts): ${x.title}`));
+    main.forEach(x => add(main.length === 1 ? "ok" : "warn", `✔ Main stream: ${x.title} — ${fmt(x.likes)} likes`));
+    if (shorts.length) add("ok", "#Shorts stream ignored ✓");
+    if (main.length === 1) add("ok", "This stream will be counted.");
+    else if (main.length > 1) add("bad", "More than one non-Shorts stream is live – the counter will not guess; it shows \"Multiple streams\".");
+    else add("warn", "No main stream live yet – the overlay will show a waiting message.");
+  } catch (e) { st.innerHTML = ""; add("bad", "Error (" + e.kind + "): " + e.message); }
+}
+function initSetup() {
+  $("setup").style.display = "block";
+  $("ch").value = DEFAULTS.channel;
+  FONTS.forEach(f => {
+    const o = document.createElement("option"); o.value = o.textContent = f; $("font").appendChild(o);
+    const t = document.createElement("div"); t.className = "tile"; t.dataset.f = f;
+    t.innerHTML = `<b style="font-family:'${f}',sans-serif">12,345</b><small>${f}</small>`;
+    t.onclick = () => { $("font").value = f; updatePreview(); }; $("gallery").appendChild(t);
+  });
+  try { const s = JSON.parse(localStorage.getItem("ytlc3") || "null"); if (s) for (const k in s) if ($(k) && s[k] !== "") $(k).value = s[k]; } catch (e) {}
+  document.querySelectorAll("#setup input, #setup select").forEach(e => e.addEventListener("input", updatePreview));
+  setTimeout(updatePreview, 300);
+}
+
+/* ---------------- OBS OVERLAY: one counter ---------------- */
+function startOverlay() {
+  const c = Object.fromEntries(q.entries());
+  const label = c.label !== undefined ? c.label : (c.l1 || "");       // old links used l1
+  const refreshMs = Math.max(5, Number(c.sec) || 15) * 1000;
+  const o = $("overlay"); o.style.display = "flex";
+  const row = buildRow(c, label, "--"); row.id = "row"; o.appendChild(row);
+  const num = row.querySelector(".num");
+
+  let channelId = null;
+  let videoId = null;      // today's selected main stream; never saved anywhere, found fresh on every page load
+  let shown = null;        // last successfully fetched like count (frozen on screen when things stop)
+  let everEnded = false;   // a stream was tracked and has ended
+  let inFlight = false, stopped = false, fails = 0, timer = null;
+
+  function showLikes(n) {
+    const t = fmt(n); num.classList.remove("msg");
+    if (t !== shown) { shown = t; num.textContent = t; row.classList.remove("bump"); void row.offsetWidth; row.classList.add("bump"); }
+  }
+  // status messages never overwrite a real like count that is already on screen
+  function showMsg(t) { if (shown === null) { num.classList.add("msg"); num.textContent = t; } }
+
+  // Look for today's main stream. Returns ms until next step, or null to stop.
+  async function discoverStep() {
+    if (!channelId) {
+      channelId = await resolveChannel(c.ch || DEFAULTS.channel);
+      if (!channelId) { showMsg("Channel not found"); return null; }
+    }
+    const { main } = pickMain(await findLive(channelId));
+    if (main.length === 1) { videoId = main[0].id; showLikes(main[0].likes); return refreshMs; }
+    showMsg(main.length > 1 ? "Multiple streams" : "Waiting for stream…");   // ambiguity is never guessed
+    return everEnded ? NEXT_MS : WAIT_MS;
+  }
+
+  // Refresh the selected stream. Returns ms until next step, or null to stop everything.
+  async function trackStep() {
+    const j = await api(`videos?part=statistics,snippet&id=${videoId}&key=${KEY}`);   // 1 quota unit
+    const v = j.items && j.items[0];                                                  // a successful reply with no item/not live = confirmed ended
+    if (v) showLikes(v.statistics.likeCount);                                         // final value comes from this same reply
+    if (v && v.snippet.liveBroadcastContent === "live") return refreshMs;
+    videoId = null; everEnded = true;                                                 // confirmed ended: drop the old ID for good
+    return c.next === "1" ? NEXT_MS : null;                                           // null = no more API requests at all
+  }
+
+  function onError(e) {
+    console.error(e);
+    if (e.kind === "quota") { showMsg("Quota exceeded"); return null; }              // retrying cannot help today
+    if (e.kind === "key") { showMsg("Invalid API key"); return null; }
+    if (++fails > MAX_FAILS) { showMsg("Connection error"); return null; }           // capped, no infinite loop
+    return Math.min(120000, refreshMs * 2 ** (fails - 1));                           // temporary: back off, keep last count, keep stream
+  }
+
+  // Single self-rescheduling timer: the next call is only scheduled after the current one finished,
+  // so requests can never overlap and there is never more than one polling loop.
+  async function step() {
+    if (stopped || inFlight) return;
+    inFlight = true;
+    let next;
+    try { next = videoId ? await trackStep() : await discoverStep(); fails = 0; }
+    catch (e) { next = onError(e); }
+    inFlight = false;
+    if (next === null) { stopped = true; clearTimeout(timer); return; }
+    clearTimeout(timer); timer = setTimeout(step, next);
+  }
+  step();
+}
+
+if (q.get("go") === "1") startOverlay(); else initSetup();
+</script>
+</body>
+</html>
